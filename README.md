@@ -426,3 +426,4 @@ See `values.yaml` for all available configuration options with detailed comments
 ## Support
 
 For issues and questions, please refer to the OpenPanel documentation or create an issue in the repository.
+https://github.com/yashGoyal40/openpanel
