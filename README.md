@@ -10,102 +10,337 @@ A Helm chart for deploying OpenPanel analytics platform on Kubernetes.
 
 ## Installation
 
-### Quick Start
+### Step 1: Add the Helm Repository
 
-1. **Clone or navigate to the chart directory:**
-   ```bash
-   cd openpanel
-   ```
+```bash
+helm repo add openpanel https://yashGoyal40.github.io/openpanel
+helm repo update
+```
 
-2. **Review and update `values.yaml`** with your configuration:
-   - Update domain names
-   - Set PostgreSQL configuration (self-hosted or external)
-   - Configure secrets (cookie secret, API keys, etc.)
+### Step 2: Configure Required Values
 
-3. **Install the chart:**
-   ```bash
-   helm install openpanel . --namespace openpanel --create-namespace
-   ```
+**⚠️ IMPORTANT:** Before installing, you **MUST** configure the required values in `values.yaml`. The chart includes placeholder values (marked with `<>`) that will cause the installation to fail if not properly configured.
 
-### Using External PostgreSQL
+Create a custom values file or download the default values:
 
-To use an external PostgreSQL database:
+```bash
+helm show values openpanel/openpanel > my-values.yaml
+```
 
-1. Set `postgresql.enabled: false` in `values.yaml`
-2. Configure `externalPostgresql` section:
-   ```yaml
-   externalPostgresql:
-     host: "your-postgres-host"
-     port: 5432
-     user: postgres
-     password: "your-password"
-     database: openpanel
-     schema: public
-   ```
+Then edit `my-values.yaml` with your configuration (see [Required Configuration](#required-configuration) below).
 
-### Using Self-Hosted PostgreSQL
+### Step 3: Install OpenPanel
 
-To deploy PostgreSQL in Kubernetes:
+```bash
+helm install my-openpanel openpanel/openpanel --version 0.1.0 --namespace openpanel --create-namespace -f my-values.yaml
+```
 
-1. Set `postgresql.enabled: true` in `values.yaml`
-2. Configure PostgreSQL settings:
-   ```yaml
-   postgresql:
-     enabled: true
-     user: postgres
-     password: "your-secure-password"
-     database: postgres
-     persistence:
-       size: 20Gi
-   ```
+Or if you want to override specific values directly:
 
-## Configuration
+```bash
+helm install my-openpanel openpanel/openpanel --version 0.1.0 --namespace openpanel --create-namespace \
+  --set ingress.fqdn=your-domain.com \
+  --set config.apiUrl=https://your-domain.com/api \
+  --set secrets.cookieSecret=$(openssl rand -base64 32)
+```
 
-### Key Configuration Options
+## Quick Start Example
 
-#### PostgreSQL
-- `postgresql.enabled`: Enable/disable self-hosted PostgreSQL
-- `externalPostgresql.*`: Configuration for external PostgreSQL
+Here's a minimal example configuration file (`my-values.yaml`) with all required values:
 
-#### Redis
-- `redis.enabled`: Enable/disable self-hosted Redis
-- `externalRedis.*`: Configuration for external Redis
+```yaml
+# Ingress Configuration
+ingress:
+  enabled: true
+  type: standard  # or "httpproxy" for Contour
+  fqdn: analytics.example.com
+  standard:
+    tlsSecretName: openpanel-tls
 
-#### ClickHouse
-- `clickhouse.enabled`: Enable/disable self-hosted ClickHouse
-- `externalClickhouse.*`: Configuration for external ClickHouse
+# Application URLs
+config:
+  apiUrl: "https://analytics.example.com/api"
+  dashboardUrl: "https://analytics.example.com"
+  googleRedirectUri: "https://analytics.example.com/api/oauth/google/callback"
 
-#### Ingress
-- `ingress.enabled`: Enable/disable ingress
-- `ingress.type`: Choose `httpproxy` (Contour) or `standard` (nginx/traefik)
-- `ingress.fqdn`: Your domain name
+# Cookie Secret (generate with: openssl rand -base64 32)
+secrets:
+  cookieSecret: "YOUR_GENERATED_SECRET_HERE"
 
-#### Application Components
-- `api.enabled`: Enable/disable API service
-- `dashboard.enabled`: Enable/disable Dashboard service
-- `worker.enabled`: Enable/disable Worker service
+# PostgreSQL - Using External Database
+postgresql:
+  enabled: false
 
-### Required Secrets
+externalPostgresql:
+  host: "postgres.example.com"
+  port: 5432
+  user: "openpanel"
+  password: "your-secure-password"
+  database: "openpanel"
+  schema: public
+```
 
-Before installation, make sure to update these in `values.yaml`:
+Then install with:
 
-1. **COOKIE_SECRET**: Generate with `openssl rand -base64 32`
-2. **Database passwords**: Update PostgreSQL credentials
-3. **API keys**: Configure email, AI, and OAuth keys as needed
+```bash
+helm install my-openpanel openpanel/openpanel --version 0.1.0 --namespace openpanel --create-namespace -f my-values.yaml
+```
+
+## Required Configuration
+
+The following values **MUST** be configured before installation. These are marked with `<>` placeholders in the default `values.yaml` and will prevent the chart from working correctly if left unchanged.
+
+### 1. Ingress Configuration (Required)
+
+Configure your fully qualified domain name (FQDN) and TLS settings:
+
+```yaml
+ingress:
+  enabled: true
+  type: httpproxy  # or "standard" for nginx/traefik
+  fqdn: your-domain.com  # Replace <fqdn> with your actual domain
+  
+  # For HTTPProxy (Contour)
+  httpproxy:
+    tlsSecretName: openpanel-tls  # Replace <tls_secret_name>
+  
+  # For standard Ingress
+  standard:
+    tlsSecretName: openpanel-tls  # Replace <tls_secret_name>
+```
+
+**Examples:**
+- `fqdn: analytics.example.com`
+- `tlsSecretName: openpanel-tls` (if using cert-manager, this will be auto-generated)
+
+### 2. Application URLs (Required)
+
+Configure the API and Dashboard URLs to match your ingress FQDN:
+
+```yaml
+config:
+  apiUrl: "https://your-domain.com/api"  # Replace <fqdn> with your domain
+  dashboardUrl: "https://your-domain.com"  # Replace <fqdn> with your domain
+  googleRedirectUri: "https://your-domain.com/api/oauth/google/callback"  # Replace <fqdn>
+```
+
+**Example:**
+```yaml
+config:
+  apiUrl: "https://analytics.example.com/api"
+  dashboardUrl: "https://analytics.example.com"
+  googleRedirectUri: "https://analytics.example.com/api/oauth/google/callback"
+```
+
+### 3. Cookie Secret (Required)
+
+Generate a secure random string for session management:
+
+```bash
+openssl rand -base64 32
+```
+
+Then set it in `values.yaml`:
+
+```yaml
+secrets:
+  cookieSecret: "YOUR_GENERATED_SECRET_HERE"  # Replace CHANGE_ME_GENERATE_A_RANDOM_32_CHAR_STRING
+```
+
+**⚠️ Security Note:** Never use the default value in production!
+
+### 4. PostgreSQL Configuration (Required - Choose One)
+
+#### Option A: External PostgreSQL (Recommended for Production)
+
+If you have an existing PostgreSQL database:
+
+```yaml
+postgresql:
+  enabled: false
+
+externalPostgresql:
+  host: "postgres.example.com"  # Replace <postgres_host>
+  port: 5432
+  user: "openpanel"  # Replace <postgres_user>
+  password: "your-secure-password"  # Replace <postgres_password>
+  database: "openpanel"  # Replace <database_name>
+  schema: public
+```
+
+#### Option B: Self-Hosted PostgreSQL
+
+To deploy PostgreSQL within Kubernetes:
+
+```yaml
+postgresql:
+  enabled: true
+  user: postgres
+  password: "your-secure-password"  # Change from default!
+  database: postgres
+  persistence:
+    size: 20Gi
+```
+
+**⚠️ Note:** If using self-hosted PostgreSQL, you don't need to configure `externalPostgresql` section.
+
+### 5. Optional: Email Configuration
+
+If you want to enable email functionality (password resets, invitations, etc.):
+
+```yaml
+secrets:
+  resendApiKey: "re_xxxxxxxxxxxxx"  # Replace <resend_api_key> with your Resend API key
+  emailSender: "noreply@your-domain.com"  # Replace <email_sender> with your verified sender email
+```
+
+**Getting a Resend API Key:**
+1. Sign up at [resend.com](https://resend.com)
+2. Create an API key in the dashboard
+3. Verify your sender email domain
+4. Add the API key and sender email to your values
+
+### 6. Optional: AI Features
+
+If you want to enable AI-powered features:
+
+```yaml
+config:
+  aiModel: "gpt-4o-mini"  # Options: gpt-4o, gpt-4o-mini, claude-3-5
+
+secrets:
+  openaiApiKey: "sk-xxxxxxxxxxxxx"  # Replace <openai_api_key> for OpenAI models
+  anthropicApiKey: ""  # Leave empty if not using Anthropic/Claude models
+  geminiApiKey: ""  # Leave empty if not using Gemini models
+```
+
+**Important Notes:**
+- You only need to configure the API key for the model you choose:
+  - For `gpt-4o` or `gpt-4o-mini`: Configure `openaiApiKey`
+  - For `claude-3-5`: Configure `anthropicApiKey`
+- **You can leave `anthropicApiKey` and `geminiApiKey` empty** (as empty strings `""`) if you don't want to use those features
+- Only configure the API keys for the AI providers you plan to use
+
+### 7. Optional: Google OAuth
+
+If you want to enable Google OAuth login:
+
+```yaml
+secrets:
+  googleClientId: "xxxxx.apps.googleusercontent.com"  # Replace <google_client_id>
+  googleClientSecret: "GOCSPX-xxxxxxxxxxxxx"  # Replace <google_client_secret>
+```
+
+**Setting up Google OAuth:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new OAuth 2.0 Client ID
+3. Add authorized redirect URI: `https://your-domain.com/api/oauth/google/callback`
+4. Copy the Client ID and Client Secret to your values
+
+## Configuration Summary
+
+| Configuration | Required | Placeholder | Description |
+|--------------|----------|-------------|-------------|
+| `ingress.fqdn` | ✅ Yes | `<fqdn>` | Your domain name |
+| `ingress.*.tlsSecretName` | ✅ Yes | `<tls_secret_name>` | TLS certificate secret name |
+| `config.apiUrl` | ✅ Yes | `<fqdn>` | Full API URL |
+| `config.dashboardUrl` | ✅ Yes | `<fqdn>` | Full Dashboard URL |
+| `config.googleRedirectUri` | ✅ Yes | `<fqdn>` | OAuth callback URL |
+| `secrets.cookieSecret` | ✅ Yes | `CHANGE_ME_...` | Session encryption key |
+| `externalPostgresql.host` | ⚠️ If external | `<postgres_host>` | PostgreSQL hostname |
+| `externalPostgresql.user` | ⚠️ If external | `<postgres_user>` | PostgreSQL username |
+| `externalPostgresql.password` | ⚠️ If external | `<postgres_password>` | PostgreSQL password |
+| `externalPostgresql.database` | ⚠️ If external | `<database_name>` | PostgreSQL database name |
+| `secrets.resendApiKey` | ❌ Optional | `<resend_api_key>` | Resend API key for emails (leave empty `""` if not using) |
+| `secrets.emailSender` | ❌ Optional | `<email_sender>` | Verified sender email (leave empty `""` if not using) |
+| `secrets.openaiApiKey` | ❌ Optional | `<openai_api_key>` | OpenAI API key (leave empty `""` if not using OpenAI) |
+| `secrets.anthropicApiKey` | ❌ Optional | `<anthropic_api_key>` | Anthropic API key (leave empty `""` if not using Anthropic/Claude) |
+| `secrets.geminiApiKey` | ❌ Optional | `<gemini_api_key>` | Gemini API key (leave empty `""` if not using Gemini) |
+| `secrets.googleClientId` | ❌ Optional | `<google_client_id>` | Google OAuth Client ID (leave empty `""` if not using) |
+| `secrets.googleClientSecret` | ❌ Optional | `<google_client_secret>` | Google OAuth Client Secret (leave empty `""` if not using) |
+
+## Additional Configuration
+
+### Redis Configuration
+
+Redis is enabled by default and will be deployed within Kubernetes. To use an external Redis instance:
+
+```yaml
+redis:
+  enabled: false
+
+externalRedis:
+  host: "redis.example.com"  # Replace with your Redis host
+  port: 6379
+```
+
+### ClickHouse Configuration
+
+ClickHouse is enabled by default and will be deployed within Kubernetes. To use an external ClickHouse instance:
+
+```yaml
+clickhouse:
+  enabled: false
+
+externalClickhouse:
+  host: "clickhouse.example.com"  # Replace with your ClickHouse host
+  port: 8123
+  database: openpanel
+```
+
+### Application Components
+
+You can enable/disable individual components:
+
+```yaml
+api:
+  enabled: true
+  replicas: 1
+
+dashboard:
+  enabled: true
+  replicas: 1
+
+worker:
+  enabled: true
+  replicas: 1
+```
+
+### Resource Limits
+
+Adjust resource requests and limits based on your cluster capacity:
+
+```yaml
+api:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+```
 
 ## Upgrading
 
+To upgrade to a newer version:
+
 ```bash
-helm upgrade openpanel . --namespace openpanel
+helm repo update
+helm upgrade my-openpanel openpanel/openpanel --version <new-version> --namespace openpanel -f my-values.yaml
 ```
+
+Replace `<new-version>` with the desired version number (e.g., `0.1.1`).
 
 ## Uninstallation
 
+To uninstall OpenPanel:
+
 ```bash
-helm uninstall openpanel --namespace openpanel
+helm uninstall my-openpanel --namespace openpanel
 ```
 
-**Note:** This will delete all resources including persistent volumes. Make sure to backup your data before uninstalling.
+**⚠️ Warning:** This will delete all resources including persistent volumes. Make sure to backup your data before uninstalling.
 
 ## Troubleshooting
 
