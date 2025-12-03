@@ -32,13 +32,13 @@ Then edit `my-values.yaml` with your configuration (see [Required Configuration]
 ### Step 3: Install OpenPanel
 
 ```bash
-helm install my-openpanel openpanel/openpanel --version 0.1.0 --namespace openpanel --create-namespace -f my-values.yaml
+helm install my-openpanel openpanel/openpanel --version 0.6.0 --namespace openpanel --create-namespace -f my-values.yaml
 ```
 
 Or if you want to override specific values directly:
 
 ```bash
-helm install my-openpanel openpanel/openpanel --version 0.1.0 --namespace openpanel --create-namespace \
+helm install my-openpanel openpanel/openpanel --version 0.6.0 --namespace openpanel --create-namespace \
   --set ingress.fqdn=your-domain.com \
   --set config.apiUrl=https://your-domain.com/api \
   --set secrets.cookieSecret=$(openssl rand -base64 32)
@@ -86,7 +86,7 @@ externalPostgresql:
 Then install with:
 
 ```bash
-helm install my-openpanel openpanel/openpanel --version 0.1.0 --namespace openpanel --create-namespace -f my-values.yaml
+helm install my-openpanel openpanel/openpanel --version 0.6.0 --namespace openpanel --create-namespace -f my-values.yaml
 ```
 
 ## Required Configuration
@@ -338,6 +338,57 @@ api:
       memory: "2Gi"
       cpu: "2000m"
 ```
+
+### Horizontal Pod Autoscaler (HPA)
+
+Enable automatic scaling of pods based on CPU and memory utilization. HPA can be configured for the API, Dashboard, and Worker components.
+
+**Prerequisites:**
+- Kubernetes Metrics Server must be installed in your cluster
+- Resource requests must be set for the pods (see [Resource Limits](#resource-limits) above)
+
+**Basic HPA Configuration:**
+
+```yaml
+api:
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+dashboard:
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+worker:
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+```
+
+**HPA Configuration Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `enabled` | Enable/disable HPA for the component | `false` |
+| `minReplicas` | Minimum number of pods | `1` |
+| `maxReplicas` | Maximum number of pods | `10` |
+| `targetCPUUtilizationPercentage` | Target CPU utilization percentage (optional) | `70` |
+| `targetMemoryUtilizationPercentage` | Target memory utilization percentage (optional) | `80` |
+
+**Important Notes:**
+- HPA requires resource requests to be set on pods. Make sure you've configured `resources.requests` for the component.
+- If both CPU and memory targets are set, HPA will scale when either threshold is exceeded.
+- For production environments, consider setting `minReplicas` to 2 or higher for high availability.
 
 ### Taints and Tolerations
 
